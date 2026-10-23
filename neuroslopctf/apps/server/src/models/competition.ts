@@ -42,9 +42,10 @@ export const competition = app.define("competition", Competition, (d) =>
         ctx
           .subselect(membership)
           .where((m) =>
-            m.userId
+            m.competitionId
               .value()
-              .equals(ctx.user.id.value())
+              .equals(ctx.id.value())
+              .and(m.userId.value().equals(ctx.user.id.value()))
               .and(m.status.value().equals(value("active"))),
           )
           .pick("role"),

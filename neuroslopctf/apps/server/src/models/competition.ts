@@ -1,7 +1,6 @@
 import { value } from "@backend/thingamajig";
 import { app } from "../app.js";
 import { isListed } from "./access.js";
-import { competitionPin } from "./competition-pin.js";
 import { membership } from "./membership.js";
 
 export class Competition {
@@ -33,9 +32,6 @@ export class Competition {
 
 export const competition = app.define("competition", Competition, (d) =>
   d
-    .inherit(competitionPin, (ctx) =>
-      ctx.left.id.value().equals(ctx.right.competitionId.value()),
-    )
     .assign(
       ["owner", "admin", "author", "reviewer", "participant", "observer"],
       (ctx) =>

@@ -1,7 +1,11 @@
 <?php
 function is_allowed_username($username)
 {
-    return preg_match('/\Abutt_[abcde0-9]{16}\z/', $username) === 1;
+    $userLen = strlen($username);
+    if ($userLen < 3 || $userLen > 32) {
+        return false;
+    }
+    return true;
 }
 
 function validate_credentials($username, $password)

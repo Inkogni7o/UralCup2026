@@ -7,7 +7,6 @@ import (
 	"slopdns/web/backend/internal/authz"
 	"slopdns/web/backend/internal/outbox"
 	"slopdns/web/backend/internal/store"
-	"slopdns/web/pkg/rbac"
 )
 
 var transferStatuses = map[string]bool{store.StatusPending: true, store.StatusAccepted: true, store.StatusDeclined: true, store.StatusCancelled: true, store.StatusExpired: true}
@@ -177,18 +176,8 @@ func pendingConflict(t store.Transfer) error {
 	return conflict("the zone transfer is " + t.Status)
 }
 
-func highestOwnedOrg(bs []authz.Binding) string {
-	best := ""
-	var bestRole authz.Role
-	for _, b := range bs {
-		if b.ResourceType != rbac.ResourceOrg || b.ResourceID != b.OrgID {
-			continue
-		}
-		if b.Role >= authz.RoleAdmin && b.Role > bestRole {
-			best, bestRole = b.OrgID, b.Role
-		}
-	}
-	return best
+func canAcceptTransferInto(bs []authz.Binding, targetOrgID string) bool {
+	return authz.OrgRole(bs, targetOrgID) >= authz.RoleAdmin
 }
 
 func (s *Service) AcceptTransfer(ctx context.Context, p authz.Principal, id, targetOrgID string) (TransferView, error) {
@@ -202,7 +191,7 @@ func (s *Service) AcceptTransfer(ctx context.Context, p authz.Principal, id, tar
 	if !ValidUUID(targetOrgID) {
 		return TransferView{}, invalid("target_org_id", "must be a UUID")
 	}
-	if authz.OrgRole(bs, highestOwnedOrg(bs)) < authz.RoleAdmin {
+	if !canAcceptTransferInto(bs, targetOrgID) {
 		return TransferView{}, forbidden("you must be owner or admin of the target organization")
 	}
 	if exists, err := s.store.Q().OrgExists(ctx, targetOrgID); err != nil {

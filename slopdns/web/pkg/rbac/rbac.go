@@ -194,12 +194,8 @@ func Roles(res Resource, bindings []Binding) (orgRole, resourceRole Role) {
 		case b.ResourceType == ResourceOrg && b.ResourceID == res.OrgID:
 			orgRole = Max(orgRole, b.Role)
 		case b.ResourceType == ResourceZone:
-			if res.Type == ResourceZone {
-				if b.ResourceID == res.ID {
-					resourceRole = Max(resourceRole, b.Role)
-				}
-			} else {
-				orgRole = Max(orgRole, b.Role)
+			if res.Type == ResourceZone && b.ResourceID == res.ID {
+				resourceRole = Max(resourceRole, b.Role)
 			}
 		case res.Type != ResourceOrg && b.ResourceType == res.Type && b.ResourceID == res.ID:
 			resourceRole = Max(resourceRole, b.Role)

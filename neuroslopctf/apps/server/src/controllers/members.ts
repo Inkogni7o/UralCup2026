@@ -2,7 +2,7 @@ import { action, HttpError, query, t, value } from "@backend/thingamajig";
 import { orm, sudo } from "../app.js";
 import { competition, type Competition } from "../models/competition.js";
 import { membership, type Membership } from "../models/membership.js";
-import { invite } from "../models/invite.js";
+import type { Invite } from "../models/invite.js";
 import { joinRequest } from "../models/join-request.js";
 import { audit } from "../services/audit.js";
 import { membershipDto, viewerOf } from "../services/dto.js";
@@ -77,46 +77,38 @@ export class MemberController {
 
     if (body.invite_code) {
       const code = body.invite_code;
-      const found = await sudo(() =>
-        orm.fetch(
-          query()
-            .select(invite)
-            .where((i) =>
-              i.code
-                .value()
-                .equals(value(code))
-                .and(i.competitionId.value().equals(value(target.id))),
-            ),
-        ),
+      const created = await sudo(() =>
+        orm.transaction(async (tx) => {
+          const [claimed] = await tx.raw<Invite>(`
+            UPDATE "invite" SET "uses" = "uses" + 1
+            WHERE "code" = ${lit(code)}
+              AND "competitionId" = ${lit(target.id)}
+              AND "revoked" = FALSE
+              AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
+              AND ("maxUses" IS NULL OR "uses" < "maxUses")
+            RETURNING *`);
+
+          if (!claimed) {
+            throw new HttpError(
+              403,
+              "The invite code is invalid or expired",
+              "invalid_invite",
+            );
+          }
+
+          const [row] = await tx.execute(
+            query().insert(membership, {
+              competitionId: target.id,
+              userId: user.id,
+              role: claimed.role,
+              status: "active",
+              invitedBy: claimed.createdBy,
+            }),
+          );
+
+          return row!;
+        }),
       );
-
-      if (!found || !inviteValid(found)) {
-        throw new HttpError(
-          403,
-          "The invite code is invalid or expired",
-          "invalid_invite",
-        );
-      }
-
-      const created = await sudo(async () => {
-        await orm.execute(
-          query()
-            .update(invite, { uses: found.uses + 1 })
-            .where((i) => i.code.value().equals(value(code))),
-        );
-
-        const [row] = await orm.execute(
-          query().insert(membership, {
-            competitionId: target.id,
-            userId: user.id,
-            role: found.role,
-            status: "active",
-            invitedBy: found.createdBy,
-          }),
-        );
-
-        return row!;
-      });
 
       return membershipDto(created);
     }

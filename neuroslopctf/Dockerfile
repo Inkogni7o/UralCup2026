@@ -13,7 +13,8 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json turbo.json ./
 COPY packages packages
 COPY apps apps
-RUN pnpm -r run build
+RUN pnpm -r run build \
+    && pnpm --filter @backend/thingamajig test
 
 ENV NODE_ENV=production
 EXPOSE 3000

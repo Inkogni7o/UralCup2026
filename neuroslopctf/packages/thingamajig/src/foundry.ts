@@ -37,7 +37,7 @@ export class SqlVisitor implements ExpressionVisitor<string> {
     } else if (value instanceof Date) {
       return `'${value.toISOString()}'`;
     } else if (typeof value === "string") {
-      return `'${value}'`;
+      return `'${value.replaceAll("'", "''")}'`;
     } else {
       return String(value);
     }

@@ -1,6 +1,7 @@
 <?php
 
 require __DIR__ . '/db.php';
+require __DIR__ . '/validate.php';
 require __DIR__ . '/jwt.php';
 require __DIR__ . '/cookie.php';
 
@@ -8,12 +9,18 @@ $body = json_decode(file_get_contents('php://input'), true) ?: [];
 $username = (string) ($body['username'] ?? '');
 $password = (string) ($body['password'] ?? '');
 
+if (!is_allowed_username($username)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'unauthorized']);
+    return;
+}
+
 $pdo = auth_db();
 $stmt = $pdo->prepare('SELECT id, username, password_hash FROM users WHERE username = ?');
 $stmt->execute([$username]);
 $row = $stmt->fetch();
 
-if (!$row || !password_verify($password, $row['password_hash'])) {
+if (!$row || !is_allowed_username($row['username']) || !password_verify($password, $row['password_hash'])) {
     http_response_code(401);
     echo json_encode(['error' => 'unauthorized']);
     return;

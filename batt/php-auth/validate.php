@@ -1,9 +1,12 @@
 <?php
+function is_allowed_username($username)
+{
+    return preg_match('/\Abutt_[abcde0-9]{16}\z/', $username) === 1;
+}
+
 function validate_credentials($username, $password)
 {
-    $len = strlen($username);
-    $nameOk = $len >= 3 && $len <= 32 && preg_match('/^[A-Za-z0-9_]+$/', $username);
-    if (!$nameOk) {
+    if (!is_allowed_username($username)) {
         return 'username must be 3-32 chars: letters, digits, underscore';
     }
 

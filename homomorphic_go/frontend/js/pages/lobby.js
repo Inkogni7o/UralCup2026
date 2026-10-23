@@ -43,12 +43,14 @@ export async function init(ready) {
       b.addEventListener('click', () => join(g.id));
       acts.appendChild(b);
     }
-    const a = document.createElement('a');
-    a.className = 'open-link';
-    a.dataset.gameId = g.id;
-    a.href = `game.html?id=${encodeURIComponent(g.id)}`;
-    a.textContent = 'Open';
-    acts.appendChild(a);
+    if ((g.black && g.black.id === user.id) || (g.white && g.white.id === user.id)) {
+      const a = document.createElement('a');
+      a.className = 'open-link';
+      a.dataset.gameId = g.id;
+      a.href = `game.html?id=${encodeURIComponent(g.id)}`;
+      a.textContent = 'Open';
+      acts.appendChild(a);
+    }
     tr.appendChild(acts);
     return tr;
   }

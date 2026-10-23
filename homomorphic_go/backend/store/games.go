@@ -48,7 +48,8 @@ func (s *Store) CreateGame(ctx context.Context, blackID int64) (int64, error) {
 
 func (s *Store) JoinGame(ctx context.Context, gameID, whiteID int64) error {
 	tag, err := s.Pool.Exec(ctx,
-		`UPDATE games SET white_id=$1,status='active' WHERE id=$2 AND white_id IS NULL AND status='waiting'`,
+		`UPDATE games SET white_id=$1,status='active'
+		 WHERE id=$2 AND white_id IS NULL AND status='waiting' AND black_id<>$1`,
 		whiteID, gameID)
 	if err != nil {
 		return mapErr(err)
@@ -88,19 +89,30 @@ func (s *Store) ListGames(ctx context.Context) ([]Game, error) {
 	return out, mapErr(rows.Err())
 }
 
-func (s *Store) ApplyMove(ctx context.Context, gameID int64, boardC []byte) error {
+func (s *Store) ApplyMove(ctx context.Context, gameID, userID int64, boardC []byte) error {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 	tag, err := tx.Exec(ctx,
-		`UPDATE games SET board_c=$1, turn=1-turn, updated_at=now() WHERE id=$2`, boardC, gameID)
+		`UPDATE games SET board_c=$1, turn=1-turn, updated_at=now()
+		 WHERE id=$2 AND status='active'
+		   AND ((turn=0 AND black_id=$3) OR (turn=1 AND white_id=$3))`,
+		boardC, gameID, userID)
 	if err != nil {
 		return mapErr(err)
 	}
 	if tag.RowsAffected() == 0 {
-		return ErrNotFound
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games WHERE id=$1)`, gameID).
+			Scan(&exists); err != nil {
+			return mapErr(err)
+		}
+		if !exists {
+			return ErrNotFound
+		}
+		return ErrConflict
 	}
 	_, err = tx.Exec(ctx,
 		`INSERT INTO moves(game_id, seq, board_c)

@@ -92,9 +92,14 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, err)
 		return
 	}
+	token, err := a.Store.CreateSession(r.Context(), u.ID)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
-		Value:    a.Tokens.Issue(u.ID),
+		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,

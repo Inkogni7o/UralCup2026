@@ -9,8 +9,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS sessions (
 	token text PRIMARY KEY,
 	user_id bigint NOT NULL REFERENCES users(id),
-	created_at timestamptz DEFAULT now()
+	created_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS sessions_created_at_idx ON sessions(created_at);
 
 CREATE TABLE IF NOT EXISTS games (
 	id bigserial PRIMARY KEY,
@@ -20,7 +22,8 @@ CREATE TABLE IF NOT EXISTS games (
 	board_c bytea,
 	turn smallint NOT NULL DEFAULT 0,
 	created_at timestamptz DEFAULT now(),
-	updated_at timestamptz DEFAULT now()
+	updated_at timestamptz DEFAULT now(),
+	CHECK (white_id IS NULL OR white_id <> black_id)
 );
 
 CREATE TABLE IF NOT EXISTS moves (

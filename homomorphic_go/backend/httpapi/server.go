@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"strings"
 
-	"homomorphicgo/auth"
 	"homomorphicgo/store"
 )
 
 type StoreIface interface {
 	CreateUser(ctx context.Context, username, passHash string) (int64, error)
+	CreateSession(ctx context.Context, userID int64) (string, error)
+	UserIDBySession(ctx context.Context, token string) (int64, error)
 	UserByUsername(ctx context.Context, username string) (*store.User, error)
 	UserByID(ctx context.Context, id int64) (*store.User, error)
 	SetPubkey(ctx context.Context, userID int64, pub []byte) error
@@ -20,7 +21,7 @@ type StoreIface interface {
 	JoinGame(ctx context.Context, gameID, whiteID int64) error
 	GetGame(ctx context.Context, id int64) (*store.Game, error)
 	ListGames(ctx context.Context) ([]store.Game, error)
-	ApplyMove(ctx context.Context, gameID int64, boardC []byte) error
+	ApplyMove(ctx context.Context, gameID, userID int64, boardC []byte) error
 	Moves(ctx context.Context, gameID int64) ([]store.Move, error)
 	AddMessage(ctx context.Context, gameID, senderID int64, ct string) error
 	Messages(ctx context.Context, gameID int64) ([]store.Message, error)
@@ -28,7 +29,6 @@ type StoreIface interface {
 
 type API struct {
 	Store       StoreIface
-	Tokens      *auth.Tokens
 	AllowOrigin string
 }
 

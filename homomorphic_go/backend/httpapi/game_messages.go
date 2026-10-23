@@ -12,6 +12,10 @@ func (a *API) moves(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !isParticipant(g, userID(r)) {
+		writeErr(w, http.StatusForbidden, "not a participant")
+		return
+	}
 	ms, err := a.Store.Moves(r.Context(), g.ID)
 	if err != nil {
 		writeStoreErr(w, err)
@@ -29,6 +33,10 @@ func (a *API) moves(w http.ResponseWriter, r *http.Request) {
 func (a *API) messages(w http.ResponseWriter, r *http.Request) {
 	g, ok := a.loadGame(w, r)
 	if !ok {
+		return
+	}
+	if !isParticipant(g, userID(r)) {
+		writeErr(w, http.StatusForbidden, "not a participant")
 		return
 	}
 	ms, err := a.Store.Messages(r.Context(), g.ID)

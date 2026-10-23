@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"homomorphicgo/auth"
 	"homomorphicgo/httpapi"
 	"homomorphicgo/store"
 )
@@ -36,7 +35,7 @@ func main() {
 	}
 	cancel()
 
-	api := &httpapi.API{Store: st, Tokens: auth.NewTokens(), AllowOrigin: os.Getenv("ALLOW_ORIGIN")}
+	api := &httpapi.API{Store: st, AllowOrigin: os.Getenv("ALLOW_ORIGIN")}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte("ok"))

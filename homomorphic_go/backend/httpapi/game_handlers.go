@@ -131,6 +131,10 @@ func (a *API) joinGame(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if g.BlackID == userID(r) {
+		writeErr(w, http.StatusConflict, "cannot join your own game")
+		return
+	}
 	pub, ok := optionalPubkey(w, r)
 	if !ok {
 		return
@@ -148,6 +152,10 @@ func (a *API) joinGame(w http.ResponseWriter, r *http.Request) {
 func (a *API) getGame(w http.ResponseWriter, r *http.Request) {
 	g, ok := a.loadGame(w, r)
 	if !ok {
+		return
+	}
+	if !isParticipant(g, userID(r)) {
+		writeErr(w, http.StatusForbidden, "not a participant")
 		return
 	}
 	black, white, err := a.players(r.Context(), g, true)
@@ -174,6 +182,14 @@ func (a *API) move(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "game finished")
 		return
 	}
+	expectedUser := g.BlackID
+	if g.Turn == 1 && g.WhiteID != nil {
+		expectedUser = *g.WhiteID
+	}
+	if g.Status != "active" || g.Turn < 0 || g.Turn > 1 || expectedUser != userID(r) {
+		writeErr(w, http.StatusConflict, "not your turn")
+		return
+	}
 	var req struct {
 		BoardCB64 string `json:"board_c_b64"`
 	}
@@ -185,7 +201,13 @@ func (a *API) move(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "board_c_b64 must decode to 361 bytes")
 		return
 	}
-	if err := a.Store.ApplyMove(r.Context(), g.ID, board); err != nil {
+	for _, v := range board {
+		if v >= 251 {
+			writeErr(w, http.StatusBadRequest, "board_c_b64 contains an invalid field element")
+			return
+		}
+	}
+	if err := a.Store.ApplyMove(r.Context(), g.ID, userID(r), board); err != nil {
 		writeStoreErr(w, err)
 		return
 	}

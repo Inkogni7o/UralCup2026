@@ -14,8 +14,8 @@ func (a *API) requireAuth(next http.Handler) http.Handler {
 			writeErr(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
-		uid, ok := a.Tokens.Parse(c.Value)
-		if !ok {
+		uid, err := a.Store.UserIDBySession(r.Context(), c.Value)
+		if err != nil {
 			writeErr(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}

@@ -37,7 +37,9 @@ function solvesSql(
     JOIN "competition" c ON c."id" = s."competitionId"
     LEFT JOIN "team" tm ON tm."id" = s."teamId"
     WHERE (s."userId" = ${lit(userId)} OR s."teamId" IN (
-      SELECT "teamId" FROM "membership" WHERE "userId" = ${lit(userId)} AND "teamId" IS NOT NULL
+      SELECT "teamId" FROM "membership"
+      WHERE "userId" = ${lit(userId)} AND "competitionId" = s."competitionId"
+        AND "role" = 'participant' AND "status" = 'active' AND "teamId" IS NOT NULL
     )) ${extraWhere}
     ORDER BY s."solvedAt" DESC, s."id" DESC
     ${page ? `LIMIT ${lit(page.limit)} OFFSET ${lit(page.offset)}` : ""}`;

@@ -28,7 +28,7 @@ export const membership: Resource<Membership> = app.define(
       .inherit(competition, (ctx) =>
         ctx.left.competitionId.value().equals(ctx.right.id.value()),
       )
-      .grant("owner", (ctx) =>
+      .grant("self", (ctx) =>
         ctx.userId.value().equals(ctx.user.id.value()),
       )
       .permissions({

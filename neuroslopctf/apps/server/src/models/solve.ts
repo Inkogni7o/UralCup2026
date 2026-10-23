@@ -30,6 +30,8 @@ export const solve = app.define("solve", Solve, (d) =>
             .value()
             .equals(ctx.competitionId.value())
             .and(m.userId.value().equals(ctx.user.id.value()))
+            .and(m.role.value().in(["participant"]))
+            .and(m.status.value().in(["active"]))
             .and(m.teamId.value().equals(ctx.teamId.value())),
         )
         .exists(),

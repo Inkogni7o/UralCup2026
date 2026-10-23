@@ -10,8 +10,8 @@ services:
       POSTGRES_PASSWORD: "${AIRQSO_POSTGRES_PASSWORD:?set AIRQSO_POSTGRES_PASSWORD}"
     volumes: ["airqso-db:/var/lib/postgresql"]
     healthcheck: { test: [CMD-SHELL, "pg_isready -U airqso -d airqso"], interval: 2s, timeout: 2s, retries: 15 }
-    cpus: 0.45
-    mem_limit: 128m
+    cpus: 0.90
+    mem_limit: 256m
     restart: unless-stopped
   migrate:
     platform: linux/amd64
@@ -20,8 +20,8 @@ services:
       AIRQSO_DATABASE_URL: "postgres://airqso:${AIRQSO_POSTGRES_PASSWORD}@postgres:5432/airqso?sslmode=disable"
       AIRQSO_MIGRATIONS_DIR: /app/migrations
     depends_on: { postgres: { condition: service_healthy } }
-    cpus: 0.10
-    mem_limit: 32m
+    cpus: 0.20
+    mem_limit: 64m
     restart: "no"
   radiod:
     platform: linux/amd64
@@ -39,8 +39,8 @@ services:
     ports: ["${AIRQSO_OBSERVER_PORT:-9001}:9001"]
     depends_on: { migrate: { condition: service_completed_successfully } }
     healthcheck: { test: [CMD, /radioctl], interval: 2s, timeout: 2s, retries: 15 }
-    cpus: 0.20
-    mem_limit: 32m
+    cpus: 0.40
+    mem_limit: 64m
     restart: unless-stopped
   web:
     platform: linux/amd64
@@ -65,8 +65,8 @@ services:
     ports: ["${AIRQSO_WEB_PORT:-8080}:8080"]
     depends_on: { migrate: { condition: service_completed_successfully }, radiod: { condition: service_started } }
     healthcheck: { test: [CMD, /healthprobe, "http://127.0.0.1:8080/health/live"], interval: 2s, timeout: 2s, retries: 15 }
-    cpus: 0.35
-    mem_limit: 80m
+    cpus: 0.70
+    mem_limit: 160m
     restart: unless-stopped
 
 volumes: { airqso-db: {}, airqso-radio: {}, airqso-assets: {} }

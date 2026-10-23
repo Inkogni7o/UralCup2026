@@ -10,7 +10,7 @@ import { requireUser, type Ctx } from "../services/http.js";
 import { lit } from "../services/sql.js";
 
 const credentials = t.object({
-  username: t.string(),
+  username: t.string({ min: 3, max: 40, pattern: /^\S+$/ }),
   password: t.string({ min: 6, max: 200 }),
 });
 

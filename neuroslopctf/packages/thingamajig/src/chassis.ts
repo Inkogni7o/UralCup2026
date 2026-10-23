@@ -27,7 +27,6 @@ export type Middleware<TUserResource extends ObjectLike> = (
 export interface ActionOptions {
   middleware?: Middleware<any>[];
   maxBodySize?: number;
-  transaction?: boolean;
 }
 
 export type ActionHandler<TUserResource extends ObjectLike = any> = (
@@ -348,8 +347,7 @@ export class Web<TUserResource extends ObjectLike> {
 
         const route = ctx.route;
         const invoke = () => Promise.resolve(route.handler(ctx));
-        const result = await (this.transactionRunner &&
-        route.options.transaction !== false
+        const result = await (this.transactionRunner
           ? this.transactionRunner(invoke)
           : invoke());
 

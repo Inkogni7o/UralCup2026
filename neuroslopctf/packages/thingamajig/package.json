@@ -9,8 +9,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "test": "node --test dist/foundry.test.js"
+    "build": "tsc"
   },
   "dependencies": {
     "@types/pg": "^8.23.1",

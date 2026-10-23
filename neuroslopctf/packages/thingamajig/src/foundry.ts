@@ -105,7 +105,7 @@ export class SqlVisitor implements ExpressionVisitor<string> {
       whereClause = "";
     }
 
-    return `EXISTS (SELECT 1 FROM ${quoteIdentifier(select.tableName)} AS ${quoteIdentifier(select.objectName)}${whereClause})`;
+    return `(SELECT COUNT(*) FROM ${quoteIdentifier(select.tableName)} AS ${quoteIdentifier(select.objectName)}${whereClause}) > 0`;
   }
 
   visitSelectExpression(expression: SelectExpression<ObjectLike>): string {

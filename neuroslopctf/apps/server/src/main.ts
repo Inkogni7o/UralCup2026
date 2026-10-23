@@ -72,21 +72,10 @@ for (const file of await migrate(driver, migrations)) {
   console.log(`Applied migration ${file}`);
 }
 
-let transitionsRunning = false;
-async function runScheduledTransitions() {
-  if (transitionsRunning) return;
-  transitionsRunning = true;
-  try {
-    await applyScheduledTransitions();
-  } catch (error) {
-    console.error(error);
-  } finally {
-    transitionsRunning = false;
-  }
-}
-
-await runScheduledTransitions();
-setInterval(runScheduledTransitions, 5000).unref();
+await applyScheduledTransitions();
+setInterval(() => {
+  applyScheduledTransitions().catch((error) => console.error(error));
+}, 5000).unref();
 
 if (process.env.DESCRIBE !== "0") {
   console.log(`Models:\n${app.describe()}\n`);

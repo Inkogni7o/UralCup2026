@@ -61,34 +61,60 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}): Promis
     headers.set('Content-Type', 'application/json');
   }
 
-  let response: Response;
+  const controller = new AbortController();
+  const abort = () => controller.abort(init.signal?.reason);
+  if (init.signal?.aborted) abort();
+  else init.signal?.addEventListener('abort', abort, { once: true });
+
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 15000);
+
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
       ...init,
       headers,
       credentials: 'same-origin',
+      signal: controller.signal,
     });
-  } catch {
+
+    const contentType = response.headers.get('content-type') ?? '';
+    const payload = contentType.includes('application/json')
+      ? await response.json().catch(() => null)
+      : await response.text().catch(() => '');
+    if (controller.signal.aborted) throw controller.signal.reason;
+
+    if (!response.ok) {
+      const detail = payload && typeof payload === 'object' && 'detail' in payload
+        ? (payload.detail as ErrorDetail)
+        : undefined;
+      const message = detailToMessage(detail) ?? `Запрос завершился с ошибкой ${response.status}`;
+      const error = new ApiError(response.status, message, detail);
+      error.code = payload?.code ?? '';
+      error.retryAfter = Math.max(0, Number(response.headers.get('Retry-After')) || 0);
+      throw error;
+    }
+
+    return payload as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (timedOut) {
+      const timeout = new ApiError(0, 'Время ожидания ответа сервиса истекло. Повторите попытку.');
+      timeout.code = 'request_timeout';
+      throw timeout;
+    }
+    if (init.signal?.aborted) {
+      const aborted = new ApiError(0, 'Запрос отменён.');
+      aborted.code = 'request_aborted';
+      throw aborted;
+    }
     throw new ApiError(0, 'Сервис не ответил. Проверьте соединение и повторите попытку.');
+  } finally {
+    clearTimeout(timer);
+    init.signal?.removeEventListener('abort', abort);
   }
-
-  const contentType = response.headers.get('content-type') ?? '';
-  const payload = contentType.includes('application/json')
-    ? await response.json().catch(() => null)
-    : await response.text().catch(() => '');
-
-  if (!response.ok) {
-    const detail = payload && typeof payload === 'object' && 'detail' in payload
-      ? (payload.detail as ErrorDetail)
-      : undefined;
-    const message = detailToMessage(detail) ?? `Запрос завершился с ошибкой ${response.status}`;
-    const error = new ApiError(response.status, message, detail);
-    error.code = payload?.code ?? '';
-    error.retryAfter = Math.max(0, Number(response.headers.get('Retry-After')) || 0);
-    throw error;
-  }
-
-  return payload as T;
 }
 
 export async function getCurrentUser(): Promise<UserProfile | null> {

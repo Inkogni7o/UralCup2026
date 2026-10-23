@@ -48,6 +48,11 @@ function lookup<TResult>(callback: () => Promise<TResult>): Promise<TResult> {
 }
 
 export const authenticate: Middleware<User> = async (ctx, next) => {
+  // Liveness must not wait for session or API-token lookups.
+  if (ctx.request.method === "GET" && ctx.route?.path === "/api/health") {
+    return next();
+  }
+
   const header = ctx.request.headers.authorization;
 
   if (header?.toLowerCase().startsWith("bearer ")) {

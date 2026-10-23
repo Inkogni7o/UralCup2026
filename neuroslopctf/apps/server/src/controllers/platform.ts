@@ -2,12 +2,12 @@ import { action } from "@backend/thingamajig";
 import { orm } from "../app.js";
 
 export class PlatformController {
-  @action("GET", "/health")
+  @action("GET", "/health", { transaction: false })
   health() {
     return { status: "ok", service: "neuroslopctf" };
   }
 
-  @action("GET", "/stats")
+  @action("GET", "/stats", { transaction: false })
   async stats() {
     const [row] = await orm.raw<Record<string, string>>(`
         SELECT

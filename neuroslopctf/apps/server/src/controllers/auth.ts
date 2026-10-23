@@ -1,4 +1,4 @@
-import { action, HttpError, query, t, value } from "@backend/thingamajig";
+import { action, HttpError, query, t, value, type Orm } from "@backend/thingamajig";
 import { orm, sudo, type User } from "../app.js";
 import { authOf, SESSION_COOKIE, SESSION_DAYS } from "../auth/middleware.js";
 import { hashPassword, verifyPassword } from "../auth/passwords.js";
@@ -15,24 +15,26 @@ const credentials = t.object({
 });
 
 export class AuthController {
-  @action("POST", "/auth/register")
+  @action("POST", "/auth/register", { transaction: false })
   async register(ctx: Ctx) {
     const body = await ctx.validBody(credentials);
-    const [created] = await sudo(async () =>
-      orm.execute(
-        query().insert(user, {
-          username: body.username,
-          passwordHash: await hashPassword(body.password),
-        }),
-      ),
-    );
+    const passwordHash = await hashPassword(body.password);
+    const { created, started } = await orm.transaction(async (tx) => {
+      const [created] = await sudo(() =>
+        tx.execute(
+          query().insert(user, { username: body.username, passwordHash }),
+        ),
+      );
+      const started = await startSession(tx, created!);
+      return { created: created!, started };
+    });
 
-    await startSession(ctx, created!);
+    setSessionCookie(ctx, started);
     ctx.response.status = 201;
-    return userDto(created!);
+    return userDto(created);
   }
 
-  @action("POST", "/auth/login")
+  @action("POST", "/auth/login", { transaction: false })
   async login(ctx: Ctx) {
     const body = await ctx.validBody(credentials);
     const [found] = await orm.raw<User>(
@@ -47,7 +49,8 @@ export class AuthController {
       );
     }
 
-    await startSession(ctx, found);
+    const started = await orm.transaction((tx) => startSession(tx, found));
+    setSessionCookie(ctx, started);
     return userDto(found);
   }
 
@@ -84,12 +87,12 @@ export class AuthController {
   }
 }
 
-async function startSession(ctx: Ctx, owner: User) {
+async function startSession(tx: Orm<User>, owner: User) {
   const token = randomToken();
   const expires = new Date(Date.now() + SESSION_DAYS * 24 * 3600 * 1000);
 
   await sudo(() =>
-    orm.execute(
+    tx.execute(
       query().insert(session, {
         token,
         userId: owner.id,
@@ -98,6 +101,13 @@ async function startSession(ctx: Ctx, owner: User) {
     ),
   );
 
+  return { token, expires };
+}
+
+function setSessionCookie(
+  ctx: Ctx,
+  { token, expires }: Awaited<ReturnType<typeof startSession>>,
+) {
   ctx.setCookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "Lax",

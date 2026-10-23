@@ -20,27 +20,28 @@ export async function verifyPassword(
   password: string,
   stored: string,
 ): Promise<boolean> {
-  const [scheme, salt, hash] = stored.split("$");
-
-  if (scheme !== "scrypt" || !salt || !hash) {
+  const parts = stored.split("$");
+  if (parts.length !== 3 || parts[0] !== "scrypt") {
     return false;
   }
 
-  const expected = Buffer.from(hash, "base64");
-
-  if (/^[A-Za-z0-9+/=]+$/.test(password)) {
-    const supplied = Buffer.from(password, "base64");
-
-    if (supplied.length === expected.length && timingSafeEqual(supplied, expected)) {
-      return true;
-    }
+  const salt = decodeBase64(parts[1]!, 16);
+  const expected = decodeBase64(parts[2]!, KEY_LENGTH);
+  if (!salt || !expected) {
+    return false;
   }
 
-  const actual = await derive(
-    password,
-    Buffer.from(salt, "base64"),
-    expected.length,
-  );
-
+  const actual = await derive(password, salt, KEY_LENGTH);
   return timingSafeEqual(actual, expected);
+}
+
+function decodeBase64(encoded: string, length: number): Buffer | null {
+  if (encoded.length !== Math.ceil(length / 3) * 4) {
+    return null;
+  }
+
+  const decoded = Buffer.from(encoded, "base64");
+  return decoded.length === length && decoded.toString("base64") === encoded
+    ? decoded
+    : null;
 }

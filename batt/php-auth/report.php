@@ -23,7 +23,7 @@ if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
     $token = $_GET['token'] ?? ($_POST['token'] ?? '');
 }
 
-if ($token === '') {
+if (!is_string($token) || $token === '' || strlen($token) > 8192) {
     http_response_code(400);
     echo json_encode(['error' => 'missing token']);
     return;
@@ -31,14 +31,30 @@ if ($token === '') {
 
 try {
     $claims = verify_government_token($token);
-} catch (\Exception $e) {
-
+} catch (\Throwable $e) {
     http_response_code(403);
     echo json_encode(['error' => 'invalid token']);
     return;
 }
 
-$gameId = (int) ($claims['game_id'] ?? 0);
+$rawGameId = $claims['game_id'] ?? null;
+$validInteger = is_int($rawGameId) && $rawGameId > 0;
+$validString = is_string($rawGameId)
+    && preg_match('/^[1-9][0-9]{0,18}$/D', $rawGameId);
+if (!$validInteger && !$validString) {
+    http_response_code(403);
+    echo json_encode(['error' => 'invalid token']);
+    return;
+}
+$gameId = filter_var($rawGameId, FILTER_VALIDATE_INT, [
+    'options' => ['min_range' => 1],
+]);
+if ($gameId === false) {
+    http_response_code(403);
+    echo json_encode(['error' => 'invalid token']);
+    return;
+}
+$alg = 'RS256';
 
 $path = reports_dir() . '/' . $gameId . '.json';
 $report = @file_get_contents($path);

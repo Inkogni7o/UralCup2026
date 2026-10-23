@@ -55,29 +55,37 @@ function remember_encode_cookie($code)
     return base64_encode(json_encode(array('code' => $code, 'version' => REMEMBER_VERSION)));
 }
 
-function remember_find_active($pdo, $rawCookie)
+function remember_cookie_code($rawCookie)
 {
+    if (!is_string($rawCookie)) {
+        return null;
+    }
     $json = base64_decode($rawCookie, true);
     if ($json === false) {
         return null;
     }
     $data = json_decode($json, true);
-    if (!is_array($data) || !isset($data['code'])) {
+    if (!is_array($data) || !is_string($data['code'] ?? null)) {
         return null;
     }
     $code = $data['code'];
+    $expectedLength = REMEMBER_ID_DIGITS + REMEMBER_SECRET_LEN;
+    if (strlen($code) !== $expectedLength
+        || !preg_match('/^[0-9]{6}[A-Za-z0-9]{32}$/D', $code)) {
+        return null;
+    }
+    return $code;
+}
 
-    $paramType = PDO::PARAM_STR;
-    if (gettype($code) === 'integer') {
-        $paramType = PDO::PARAM_INT;
-    } elseif (gettype($code) === 'boolean') {
-        $paramType = PDO::PARAM_BOOL;
-    } elseif ($code === null) {
-        $paramType = PDO::PARAM_NULL;
+function remember_find_active($pdo, $rawCookie)
+{
+    $code = remember_cookie_code($rawCookie);
+    if ($code === null) {
+        return null;
     }
 
     $stmt = $pdo->prepare('SELECT user_id FROM persistences WHERE code = ? AND expires_at > NOW()');
-    $stmt->bindValue(1, $code, $paramType);
+    $stmt->bindValue(1, $code, PDO::PARAM_STR);
     $stmt->execute();
     $row = $stmt->fetch();
     return $row ? (int) $row['user_id'] : null;
@@ -85,27 +93,13 @@ function remember_find_active($pdo, $rawCookie)
 
 function remember_delete_one($pdo, $rawCookie)
 {
-    $json = base64_decode($rawCookie, true);
-    if ($json === false) {
+    $code = remember_cookie_code($rawCookie);
+    if ($code === null) {
         return;
-    }
-    $data = json_decode($json, true);
-    if (!is_array($data) || !isset($data['code'])) {
-        return;
-    }
-    $code = $data['code'];
-
-    $paramType = PDO::PARAM_STR;
-    if (gettype($code) === 'integer') {
-        $paramType = PDO::PARAM_INT;
-    } elseif (gettype($code) === 'boolean') {
-        $paramType = PDO::PARAM_BOOL;
-    } elseif ($code === null) {
-        $paramType = PDO::PARAM_NULL;
     }
 
     $stmt = $pdo->prepare('DELETE FROM persistences WHERE code = ?');
-    $stmt->bindValue(1, $code, $paramType);
+    $stmt->bindValue(1, $code, PDO::PARAM_STR);
     $stmt->execute();
 }
 

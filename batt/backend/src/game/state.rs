@@ -315,6 +315,7 @@ impl Game {
         Ok(game)
     }
     pub fn spectator_view(&self) -> SpectatorView {
+        let reveal_fleets = self.status == Status::Finished;
         SpectatorView {
             id: self.id,
             mode: self.mode,
@@ -323,15 +324,21 @@ impl Game {
             winner: self.winner.map(obfuscate_id),
             player1: obfuscate_id(self.player1),
             player2: self.player2.map(obfuscate_id),
-            player1_ships: self
-                .board_ships(self.player1)
-                .map(|s| s.to_vec())
-                .unwrap_or_default(),
-            player2_ships: self
-                .player2
-                .and_then(|p2| self.board_ships(p2))
-                .map(|s| s.to_vec())
-                .unwrap_or_default(),
+            player1_ships: if reveal_fleets {
+                self.board_ships(self.player1)
+                    .map(|s| s.to_vec())
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            },
+            player2_ships: if reveal_fleets {
+                self.player2
+                    .and_then(|p2| self.board_ships(p2))
+                    .map(|s| s.to_vec())
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            },
             moves: self.moves.iter().map(move_view).collect(),
         }
     }
@@ -370,5 +377,48 @@ impl Game {
                 _ => Vec::new(),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::bot::random_fleet;
+
+    fn game_with_fleets(status: Status) -> (Game, Vec<Ship>, Vec<Ship>) {
+        let player1_fleet = random_fleet(&mut rand::rng());
+        let player2_fleet = random_fleet(&mut rand::rng());
+        let game = Game::restore(
+            7,
+            Mode::Pvp,
+            status,
+            11,
+            Some(22),
+            11,
+            None,
+            vec![(11, player1_fleet.clone()), (22, player2_fleet.clone())],
+            &[],
+        )
+        .expect("valid game");
+        (game, player1_fleet, player2_fleet)
+    }
+
+    #[test]
+    fn spectator_cannot_see_fleets_during_game() {
+        let (game, player1_fleet, _) = game_with_fleets(Status::Active);
+
+        let spectator = game.spectator_view();
+        assert!(spectator.player1_ships.is_empty());
+        assert!(spectator.player2_ships.is_empty());
+        assert_eq!(game.view_for(11).my_ships, player1_fleet);
+    }
+
+    #[test]
+    fn spectator_can_see_fleets_after_game() {
+        let (game, player1_fleet, player2_fleet) = game_with_fleets(Status::Finished);
+
+        let spectator = game.spectator_view();
+        assert_eq!(spectator.player1_ships, player1_fleet);
+        assert_eq!(spectator.player2_ships, player2_fleet);
     }
 }

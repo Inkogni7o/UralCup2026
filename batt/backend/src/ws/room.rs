@@ -118,6 +118,15 @@ pub async fn get_or_load(
 fn send_to(conn: &Conn, msg: &serde_json::Value) {
     let _ = conn.tx.send(msg.to_string());
 }
+fn broadcast_chat(inner: &RoomInner, payload: &str) {
+    for conn in inner
+        .conns
+        .iter()
+        .filter(|conn| inner.game.is_participant(conn.user_id))
+    {
+        let _ = conn.tx.send(payload.to_string());
+    }
+}
 fn state_for(inner: &RoomInner, user: u64) -> serde_json::Value {
     let mut view = if inner.game.is_participant(user) {
         json!(inner.game.view_for(user))
@@ -437,8 +446,65 @@ pub async fn send_chat(
             ChatError::Internal
         })?;
     let payload = json!({ "type" : "chat_message", "message" : message }).to_string();
-    for conn in &inner.conns {
-        let _ = conn.tx.send(payload.clone());
-    }
+    broadcast_chat(&inner, &payload);
     Ok(message)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::mpsc;
+
+    #[test]
+    fn chat_broadcast_skips_spectators() {
+        let game = Game::restore(
+            7,
+            Mode::Pvp,
+            Status::Active,
+            11,
+            Some(22),
+            11,
+            None,
+            Vec::new(),
+            &[],
+        )
+        .expect("valid game");
+        let (player1_tx, mut player1_rx) = mpsc::unbounded_channel();
+        let (player2_tx, mut player2_rx) = mpsc::unbounded_channel();
+        let (spectator_tx, mut spectator_rx) = mpsc::unbounded_channel();
+        let inner = RoomInner {
+            game,
+            bot: None,
+            conns: vec![
+                Conn {
+                    id: 1,
+                    user_id: 11,
+                    tx: player1_tx,
+                },
+                Conn {
+                    id: 2,
+                    user_id: 22,
+                    tx: player2_tx,
+                },
+                Conn {
+                    id: 3,
+                    user_id: 33,
+                    tx: spectator_tx,
+                },
+            ],
+            bot_running: false,
+            watchdog_running: false,
+            turn_deadline: Instant::now(),
+            absent_since: HashMap::new(),
+            chat_limits: HashMap::new(),
+            names: HashMap::new(),
+            finished_at: None,
+        };
+
+        broadcast_chat(&inner, "private");
+
+        assert_eq!(player1_rx.try_recv().expect("player 1 message"), "private");
+        assert_eq!(player2_rx.try_recv().expect("player 2 message"), "private");
+        assert!(spectator_rx.try_recv().is_err());
+    }
 }

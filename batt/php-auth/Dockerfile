@@ -1,11 +1,10 @@
 FROM php:8.2-cli
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
 RUN docker-php-ext-install pdo_mysql
 WORKDIR /app
 COPY . .
-
-RUN curl -fsSL https://storage.yandexcloud.net/ural/hgavwepz/JWT.php -o JWT.php
-
+RUN php -l jwt.php \
+    && php -l remember.php \
+    && php -l report.php \
+    && php tests/security.php
 EXPOSE 8080
 CMD ["php", "-S", "0.0.0.0:8080", "-t", "public", "router.php"]

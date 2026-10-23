@@ -17,12 +17,12 @@ type credentials struct {
 }
 
 func validUsername(s string) bool {
-	if len(s) < 1 || len(s) > 32 {
+	if len(s) != 12 || s[:2] != "u_" {
 		return false
 	}
-	for i := 0; i < len(s); i++ {
+	for i := 2; i < len(s); i++ {
 		c := s[i]
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_') {
+		if !(c >= 'a' && c <= 'f' || c >= '0' && c <= '9') {
 			return false
 		}
 	}
